@@ -1,0 +1,22 @@
+{
+  "name": "bitacora360-api-testing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pruebas automatizadas de API de Bitácora360 con Playwright",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:auth": "playwright test --project=auth",
+    "test:habits": "playwright test --project=habits",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,16 @@
+# dependencies
+/node_modules
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# saved access tokens of the test users
+/.auth/
+
+# env files (test user credentials)
+.env
+.env.*
+!.env.example
