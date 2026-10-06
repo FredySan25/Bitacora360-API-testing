@@ -57,14 +57,20 @@ Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `feature
 - `visitor` (por worker): contexto con la anon key y sin token.
 - `habitName`: nombre único por prueba. Al terminar, borra de ambos usuarios todo hábito cuyo nombre empiece con él.
 - `habit`: un hábito de `userA` llamado `habitName`, creado antes de la prueba.
+- `exerciseName` y `exercise`: lo mismo para `exercises`. La limpieza borra primero las series que apuntan a esos ejercicios, porque `workout_sets.exercise_id` es `on delete restrict`.
+- `workoutTitle`: título único por prueba. Al terminar, borra de ambos usuarios todo entrenamiento cuyo título empiece con él.
+- `workout`: un entrenamiento de `userA` titulado `workoutTitle`. Se borra por id, así que la prueba puede cambiarle o quitarle el título.
+
+Los fixtures crean y limpian con `insertRow` y `deleteRows`, que hacen fallar la prueba con la respuesta de Supabase si la petición es rechazada.
 
 ## Convenciones
 
 - Las specs importan `test` y `expect` de `support/fixtures`.
 - Los filtros van en `params` (`{ id: "eq.<uuid>" }`), no pegados a la URL.
-- Un rechazo se verifica con `expectError(response, status, code)`: status HTTP más el código del error. En la Data API el código es el de Postgres (`23514` check, `23505` duplicado, `23503` llave foránea, `42501` permiso o RLS); en Auth viene en `error_code` (`invalid_credentials`).
+- Un rechazo se verifica con `expectError(response, status, code)`: status HTTP más el código del error. En la Data API el código es el de Postgres (`23514` check, `23502` columna obligatoria sin valor, `22003` número fuera del rango de la columna, `23505` duplicado, `23503` llave foránea, `42501` permiso o RLS); en Auth viene en `error_code` (`invalid_credentials`).
 - `42501` responde 403 con sesión y 401 sin ella.
 - RLS oculta las filas ajenas en lugar de responder con error: un `GET` llega vacío, y un `PATCH` o `DELETE` responde bien sin tocar nada. Esas pruebas verifican después, con el dueño, que la fila sigue igual. Solo el `with check` (insertar o reasignar una fila a otro usuario) responde 403.
 - Para leer la fila que devuelve una escritura se manda `RETURN_ROWS`; sin ese header la respuesta llega vacía.
-- Las pruebas corren en paralelo con los mismos dos usuarios y no dependen de los datos que ya existan. Todo hábito que crea una prueba se llama `habitName` o empieza con él (`${habitName} renamed`), que es lo que permite la limpieza. Las filas hijas (`habit_completions`) se van solas por el `on delete cascade`.
-- Una tabla sin columna de nombre necesitará su propia forma de limpieza: un fixture que cree la fila padre y la borre al terminar.
+- Las pruebas corren en paralelo con los mismos dos usuarios y no dependen de los datos que ya existan. Todo hábito que crea una prueba se llama `habitName` o empieza con él (`${habitName} renamed`), que es lo que permite la limpieza; lo mismo con `exerciseName` para los ejercicios y `workoutTitle` para los entrenamientos. Las filas hijas (`habit_completions`, `workout_sets`) se van solas por el `on delete cascade` de su padre.
+- Una fila que la limpieza por prefijo no alcanza (un entrenamiento sin título) se crea con un fixture que la borra por id, como `workout`. Una tabla nueva sin columna de nombre sigue ese mismo patrón.
+- Cuando la política RLS comprueba una tabla padre, se evalúa antes que la llave foránea: apuntar a un padre que no existe o que es de otro usuario responde `42501`, no `23503`.

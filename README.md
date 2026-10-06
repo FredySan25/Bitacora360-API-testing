@@ -37,14 +37,14 @@ correr al mismo tiempo sin estorbarse.
 
 No hace falta levantar la app: las pruebas van directo a Supabase.
 
-| Comando               | Qué hace                                                 |
-| --------------------- | -------------------------------------------------------- |
-| `npm test`            | Corre toda la suite                                      |
-| `npm run test:auth`   | Auth y acceso sin sesión (no requiere los dos usuarios)  |
-| `npm run test:habits` | Tablas del módulo de hábitos (inicia sesión antes)       |
-| `npm run test:ui`     | Modo UI: correr, depurar y ver cada petición             |
-| `npm run report`      | Abre el reporte HTML de la última corrida                |
-| `npm run typecheck`   | Revisa los tipos de TypeScript                           |
+| Comando               | Qué hace                                                  |
+| --------------------- | --------------------------------------------------------- |
+| `npm test`            | Corre toda la suite                                       |
+| `npm run test:auth`   | Auth y acceso sin sesión (no requiere los dos usuarios)   |
+| `npm run test:habits` | Tablas del módulo de hábitos (inicia sesión antes)        |
+| `npm run test:ui`     | Modo UI: correr, depurar y ver cada petición              |
+| `npm run report`      | Abre el reporte HTML de la última corrida                 |
+| `npm run typecheck`   | Revisa los tipos de TypeScript                            |
 
 Un archivo o una prueba en particular:
 
@@ -59,7 +59,7 @@ npx playwright test -g "row level security"
 support/
   env.ts          Variables de .env (proyecto de Supabase y usuarios de prueba)
   supabase.ts     Peticiones a Supabase: inicio de sesión, contexto de la Data API, expectError
-  fixtures.ts     userA, userB, visitor, habitName y habit
+  fixtures.ts     userA, userB, visitor y los datos de cada prueba (habit, exercise, workout)
 tests/
   users.setup.ts  Inicia sesión con los dos usuarios y guarda sus tokens en .auth/
   auth/           Sin sesión guardada: inicio de sesión y acceso sin sesión
@@ -86,19 +86,21 @@ en la app, y dentro hay una spec por tabla.
 - Una prueba que espera un rechazo verifica el status HTTP y el código del
   error con `expectError(response, status, code)`. Los más comunes:
 
-  | Código  | Status    | Qué significa                                             |
-  | ------- | --------- | --------------------------------------------------------- |
-  | `23514` | 400       | No cumple un `check` (largo del nombre, días válidos)     |
-  | `23505` | 409       | Fila duplicada (clave primaria o índice único)            |
-  | `23503` | 409       | Rompe una llave foránea                                   |
-  | `42501` | 403 / 401 | Sin permiso o rechazado por RLS (401 si no hay sesión)    |
+  | Código  | Status    | Qué significa                                          |
+  | ------- | --------- | ------------------------------------------------------ |
+  | `23514` | 400       | No cumple un `check` (largo del nombre, días válidos)  |
+  | `23502` | 400       | Falta una columna obligatoria                          |
+  | `22003` | 400       | Número fuera del rango de la columna                   |
+  | `23505` | 409       | Fila duplicada (clave primaria o índice único)         |
+  | `23503` | 409       | Rompe una llave foránea                                |
+  | `42501` | 403 / 401 | Sin permiso o rechazado por RLS (401 si no hay sesión) |
 
 - RLS no responde con error al leer, modificar o borrar filas ajenas: las
   oculta. La lectura llega vacía y la escritura no cambia nada, así que esas
   pruebas verifican después, con el dueño, que la fila sigue intacta.
 - Las pruebas no dependen de los datos que ya tengan los usuarios: cada una crea
-  lo que necesita con un nombre único (`habitName`) y el fixture lo borra al
-  terminar.
+  lo que necesita con un nombre único (`habitName`, `exerciseName`,
+  `workoutTitle`) y el fixture lo borra al terminar.
 
 ## Agregar un módulo nuevo
 
