@@ -22,9 +22,9 @@ export function getSupabase(): { url: string; anonKey: string } {
 export function hasTestUsers(): boolean {
   return Boolean(
     process.env.API_USER_A_EMAIL &&
-      process.env.API_USER_A_PASSWORD &&
-      process.env.API_USER_B_EMAIL &&
-      process.env.API_USER_B_PASSWORD,
+    process.env.API_USER_A_PASSWORD &&
+    process.env.API_USER_B_EMAIL &&
+    process.env.API_USER_B_PASSWORD,
   );
 }
 

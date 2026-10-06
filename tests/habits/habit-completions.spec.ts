@@ -44,7 +44,7 @@ test.describe("habit_completions", () => {
         headers: { Prefer: "resolution=ignore-duplicates" },
         data: { habit_id: habit.id, completed_on: DAY },
       });
-      expect(response).toBeOK();
+      await expect(response).toBeOK();
     }
 
     expect(await (await listCompletions(userA, habit)).json()).toHaveLength(1);

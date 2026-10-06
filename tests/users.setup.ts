@@ -5,9 +5,12 @@ import { SESSION_FILE, getTestUsers, type Credentials } from "../support/env";
 import type { SavedSession, SavedUser } from "../support/fixtures";
 import { signIn } from "../support/supabase";
 
-async function signInUser(request: APIRequestContext, credentials: Credentials): Promise<SavedUser> {
+async function signInUser(
+  request: APIRequestContext,
+  credentials: Credentials,
+): Promise<SavedUser> {
   const response = await signIn(request, credentials);
-  expect(response, `Sign-in of ${credentials.email}: ${await response.text()}`).toBeOK();
+  await expect(response, `Sign-in of ${credentials.email}: ${await response.text()}`).toBeOK();
 
   const body = await response.json();
   return { id: body.user.id, accessToken: body.access_token };

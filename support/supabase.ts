@@ -1,9 +1,4 @@
-import {
-  expect,
-  request,
-  type APIRequestContext,
-  type APIResponse,
-} from "@playwright/test";
+import { expect, request, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { getSupabase, type Credentials } from "./env";
 
 /** Asks the Data API to answer a write with the rows it wrote, instead of an empty body. */

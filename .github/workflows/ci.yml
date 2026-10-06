@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The suite tests the schema deployed in Supabase, which changes with the
+  # migrations of the web repository and not with this one: run it by hand
+  # after applying a migration
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: Types, lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+
+  api:
+    name: API tests against Supabase
+    needs: static
+    runs-on: ubuntu-latest
+    # Every run signs in with the same two test users, and each test only
+    # touches rows it created, so runs do not need to wait for each other
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      API_USER_A_EMAIL: ${{ secrets.API_USER_A_EMAIL }}
+      API_USER_A_PASSWORD: ${{ secrets.API_USER_A_PASSWORD }}
+      API_USER_B_EMAIL: ${{ secrets.API_USER_B_EMAIL }}
+      API_USER_B_PASSWORD: ${{ secrets.API_USER_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # No browsers to install: the tests only make HTTP requests
+      - run: npm ci
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

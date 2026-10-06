@@ -24,7 +24,9 @@ npm run test:auth         # auth y acceso sin sesión
 npm run test:habits       # tablas del módulo de hábitos (corre setup antes)
 npm run test:ui           # modo UI de Playwright
 npm run report            # abre el reporte HTML de la última corrida
-npm run typecheck         # tsc --noEmit; es la única verificación estática, no hay linter
+npm run typecheck         # tsc --noEmit
+npm run lint              # oxlint con información de tipos: un await olvidado es un error
+npm run format            # Prettier; format:check solo revisa
 
 npx playwright test tests/habits/habits.spec.ts     # un archivo
 npx playwright test -g "row level security"         # pruebas por título
@@ -62,6 +64,12 @@ Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `feature
 - `workout`: un entrenamiento de `userA` titulado `workoutTitle`. Se borra por id, así que la prueba puede cambiarle o quitarle el título.
 
 Los fixtures crean y limpian con `insertRow` y `deleteRows`, que hacen fallar la prueba con la respuesta de Supabase si la petición es rechazada.
+
+## Verificación estática
+
+Antes de dar por terminado un cambio pasan `npm run typecheck`, `npm run lint` y `npm run format:check`.
+
+El linter es oxlint (`.oxlintrc.json`) y no ESLint, porque `typescript-eslint` todavía no soporta TypeScript 7. Corre las reglas de corrección más las de promesas (`no-floating-promises`, `no-misused-promises`, `await-thenable`): una aserción asíncrona sin `await`, como `expect(response).toBeOK()`, no hace fallar la prueba. `no-empty-pattern` está apagada solo en `support/fixtures.ts`, porque Playwright exige que un fixture desestructure su primer argumento aunque no use ninguno (`async ({}, use) =>`).
 
 ## Convenciones
 

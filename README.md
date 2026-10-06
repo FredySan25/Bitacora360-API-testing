@@ -45,6 +45,8 @@ No hace falta levantar la app: las pruebas van directo a Supabase.
 | `npm run test:ui`     | Modo UI: correr, depurar y ver cada petición              |
 | `npm run report`      | Abre el reporte HTML de la última corrida                 |
 | `npm run typecheck`   | Revisa los tipos de TypeScript                            |
+| `npm run lint`        | Linter (oxlint): errores de código y promesas sin `await` |
+| `npm run format`      | Da formato con Prettier (`format:check` solo revisa)      |
 
 Un archivo o una prueba en particular:
 
@@ -101,6 +103,21 @@ en la app, y dentro hay una spec por tabla.
 - Las pruebas no dependen de los datos que ya tengan los usuarios: cada una crea
   lo que necesita con un nombre único (`habitName`, `exerciseName`,
   `workoutTitle`) y el fixture lo borra al terminar.
+
+## Integración continua
+
+`.github/workflows/ci.yml` corre en cada push a `main` y en cada pull request:
+primero tipos, linter y formato, y después la suite completa contra Supabase. El
+reporte HTML queda como artefacto de la corrida.
+
+La suite necesita estos secretos en el repositorio de GitHub (Settings → Secrets
+and variables → Actions), con los mismos valores del `.env`: `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `API_USER_A_EMAIL`, `API_USER_A_PASSWORD`,
+`API_USER_B_EMAIL` y `API_USER_B_PASSWORD`.
+
+Como lo que se prueba es el esquema desplegado, y ese cambia con las migraciones
+del proyecto web, el workflow también se puede lanzar a mano (Actions → CI → Run
+workflow) después de aplicar una migración.
 
 ## Agregar un módulo nuevo
 

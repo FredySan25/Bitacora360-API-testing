@@ -12,7 +12,10 @@ test.describe("Password sign-in", () => {
 
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toMatchObject({ token_type: "bearer", user: { email: userA.email.toLowerCase() } });
+    expect(body).toMatchObject({
+      token_type: "bearer",
+      user: { email: userA.email.toLowerCase() },
+    });
     expect(body.access_token).toEqual(expect.any(String));
     expect(body.refresh_token).toEqual(expect.any(String));
   });
@@ -21,7 +24,10 @@ test.describe("Password sign-in", () => {
     test.skip(!hasTestUsers(), "Needs the API_USER_* credentials in .env");
     const { userA } = getTestUsers();
 
-    const response = await signIn(request, { email: userA.email, password: `${userA.password}-wrong` });
+    const response = await signIn(request, {
+      email: userA.email,
+      password: `${userA.password}-wrong`,
+    });
 
     await expectError(response, 400, "invalid_credentials");
   });
