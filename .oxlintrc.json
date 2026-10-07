@@ -16,5 +16,5 @@
       }
     }
   ],
-  "ignorePatterns": ["playwright-report", "test-results"]
+  "ignorePatterns": ["playwright-report", "test-results", "allure-results", "allure-report"]
 }

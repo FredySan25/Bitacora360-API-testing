@@ -10,7 +10,13 @@ async function signInUser(
   credentials: Credentials,
 ): Promise<SavedUser> {
   const response = await signIn(request, credentials);
-  await expect(response, `Sign-in of ${credentials.email}: ${await response.text()}`).toBeOK();
+  // Not an expect with the answer as its message: Playwright titles the step
+  // with that message, and the answer of a sign-in that worked has the tokens
+  if (!response.ok()) {
+    throw new Error(
+      `Supabase answered ${response.status()} signing in ${credentials.email}: ${await response.text()}`,
+    );
+  }
 
   const body = await response.json();
   return { id: body.user.id, accessToken: body.access_token };

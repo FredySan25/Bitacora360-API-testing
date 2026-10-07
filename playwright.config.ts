@@ -12,11 +12,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  globalSetup: "./support/clean-allure-results.ts",
+  // The redacting reporter goes first: Allure copies the title of a step as
+  // soon as it begins, and the error of a test as soon as it ends
+  reporter: [
+    ["./support/redact-secrets-reporter.ts"],
+    ["list"],
+    ["html", { open: "never" }],
+    ["allure-playwright"],
+  ],
   expect: { timeout: 10_000 },
 
   use: {
-    trace: "on-first-retry",
+    // The CI report is published to GitHub Pages, and a trace records every
+    // request: the passwords and the access tokens of the test users
+    trace: process.env.CI ? "off" : "on-first-retry",
   },
 
   // No browsers and no web server: the tests talk to Supabase over HTTP.

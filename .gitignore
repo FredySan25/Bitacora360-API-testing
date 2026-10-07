@@ -14,3 +14,8 @@
 .env
 .env.*
 !.env.example
+
+# allure
+/allure-results/
+/allure-report/
+/allure-history.jsonl

@@ -12,6 +12,7 @@
     "test:habits": "playwright test --project=habits",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
+    "report:allure": "allure open allure-results",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -20,6 +21,8 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.4",
+    "allure": "^3.20.1",
+    "allure-playwright": "^3.13.0",
     "oxlint": "^1.87.0",
     "oxlint-tsgolint": "^7.0.2003",
     "prettier": "^3.9.9",

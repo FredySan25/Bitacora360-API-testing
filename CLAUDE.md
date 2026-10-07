@@ -24,6 +24,7 @@ npm run test:auth         # auth y acceso sin sesión
 npm run test:habits       # tablas del módulo de hábitos (corre setup antes)
 npm run test:ui           # modo UI de Playwright
 npm run report            # abre el reporte HTML de la última corrida
+npm run report:allure     # genera y abre el reporte de Allure de la última corrida
 npm run typecheck         # tsc --noEmit
 npm run lint              # oxlint con información de tipos: un await olvidado es un error
 npm run format            # Prettier; format:check solo revisa
@@ -70,6 +71,21 @@ Los fixtures crean y limpian con `insertRow` y `deleteRows`, que hacen fallar la
 Antes de dar por terminado un cambio pasan `npm run typecheck`, `npm run lint` y `npm run format:check`.
 
 El linter es oxlint (`.oxlintrc.json`) y no ESLint, porque `typescript-eslint` todavía no soporta TypeScript 7. Corre las reglas de corrección más las de promesas (`no-floating-promises`, `no-misused-promises`, `await-thenable`): una aserción asíncrona sin `await`, como `expect(response).toBeOK()`, no hace fallar la prueba. `no-empty-pattern` está apagada solo en `support/fixtures.ts`, porque Playwright exige que un fixture desestructure su primer argumento aunque no use ninguno (`async ({}, use) =>`).
+
+## Integración continua
+
+`.github/workflows/ci.yml` tiene tres jobs encadenados: `static` (tipos, lint, formato), `api` (corre toda la suite contra Supabase y arma el sitio) y `report` (lo publica en GitHub Pages desde `main`, también con pruebas fallidas). Los secretos y la configuración de Pages están en el README.
+
+Cada corrida escribe dos reportes: el HTML de Playwright (`playwright-report/`) y los resultados de Allure (`allure-results/`, que `support/clean-allure-results.ts` vacía al empezar). El sitio publicado lleva el reporte de Allure en la raíz, generado con `allure generate` según `allurerc.ts`, y el de Playwright en `/playwright/`. La tendencia entre corridas sale de `allure-history.jsonl`, que el job descarga del sitio publicado antes de generar y vuelve a subir.
+
+El sitio es público, y eso condiciona la configuración:
+
+- En CI `trace` está apagado: una traza guarda cada petición, con las contraseñas y los access tokens. No se vuelve a encender ahí.
+- Una aserción fallida imprime lo que recibió: el cuerpo de un inicio de sesión trae `access_token` y `refresh_token`, y el registro de un `toBeOK()` fallido trae la cabecera `Authorization`. `support/redact-secrets-reporter.ts` reemplaza por `***` las contraseñas `API_USER_*_PASSWORD`, todo JWT y el valor de `refresh_token` en los títulos de los pasos, en los errores y en los adjuntos de texto (Playwright adjunta el error de cada prueba fallida como `error-context.md`). Va primero en la lista de `playwright.config.ts`: Allure copia el título de un paso en cuanto empieza y el error y los adjuntos en cuanto la prueba termina.
+- El workflow revisa el sitio antes de subirlo y no publica si encuentra una contraseña, un JWT o un refresh token. Si una prueba nueva maneja otro secreto (una service role key, un código de un solo uso), hay que agregarlo al reporter y a esa revisión.
+- Un `expect(valor, mensaje)` titula su paso con el mensaje aunque pase, así que el mensaje no lleva nunca la respuesta de un inicio de sesión. `tests/users.setup.ts` la incluye solo en el `Error` que lanza cuando Supabase rechaza el inicio de sesión.
+
+A diferencia de la suite E2E, el job `api` no necesita `concurrency`: cada prueba solo toca las filas que creó.
 
 ## Convenciones
 
