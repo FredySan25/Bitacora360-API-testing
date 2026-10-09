@@ -35,5 +35,6 @@ export default defineConfig({
     { name: "setup", testMatch: /users\.setup\.ts/ },
     { name: "auth", testDir: "./tests/auth" },
     { name: "habits", testDir: "./tests/habits", dependencies: ["setup"] },
+    { name: "finance", testDir: "./tests/finance", dependencies: ["setup"] },
   ],
 });

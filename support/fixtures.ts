@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { test as base, type APIRequestContext } from "@playwright/test";
 import { SESSION_FILE } from "./env";
@@ -47,6 +47,44 @@ export type WorkoutSetRow = {
   created_at: string;
 };
 
+export type TransactionRow = {
+  id: string;
+  user_id: string;
+  type: "income" | "expense";
+  category: string;
+  amount: number;
+  occurred_on: string;
+  note: string | null;
+  created_at: string;
+};
+
+export type BudgetRow = {
+  id: string;
+  user_id: string;
+  category: string;
+  effective_from: string;
+  monthly_limit: number;
+  created_at: string;
+};
+
+export type SavingsGoalRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: number;
+  target_date: string | null;
+  created_at: string;
+};
+
+export type SavingsContributionRow = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  amount: number;
+  contributed_on: string;
+  created_at: string;
+};
+
 type TestFixtures = {
   /**
    * Unique name for the habits of one test. When the test ends, every habit of
@@ -74,6 +112,34 @@ type TestFixtures = {
    * deleted by id, so a test is free to change or clear its title.
    */
   workout: WorkoutRow;
+  /**
+   * Unique note for the transactions of one test. When the test ends, every
+   * transaction of either user whose note starts with it is deleted.
+   */
+  transactionNote: string;
+  /**
+   * An expense of user A with the required columns alone, so it has no note,
+   * created before the test. It is deleted by id.
+   */
+  transaction: TransactionRow;
+  /**
+   * First day of a month that belongs to one test, along with the month after
+   * it (`monthAfter`). When the test ends, every budget of either user that
+   * starts in those two months is deleted.
+   */
+  budgetMonth: string;
+  /** A budget of user A for "food" that starts on `budgetMonth`, created before the test. */
+  budget: BudgetRow;
+  /**
+   * Unique name for the savings goals of one test. When the test ends, every
+   * goal of either user whose name starts with it is deleted, along with its
+   * contributions.
+   */
+  goalName: string;
+  /** A savings goal of user A named `goalName`, created before the test. */
+  savingsGoal: SavingsGoalRow;
+  /** A contribution of user A to `savingsGoal`, created before the test. It is deleted by id. */
+  savingsContribution: SavingsContributionRow;
 };
 
 type WorkerFixtures = {
@@ -104,6 +170,25 @@ async function useSavedUser(name: keyof SavedSession, use: (user: ApiUser) => Pr
 // No underscores: the cleanup filters with LIKE, where "_" matches any character
 function uniqueName(kind: string): string {
   return `API ${kind} ${randomBytes(4).toString("hex")}`;
+}
+
+/** The first day of the month that follows the one `firstDay` starts. */
+export function monthAfter(firstDay: string): string {
+  const date = new Date(`${firstDay}T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * A budget is unique per user, category and month, and the tests share two
+ * users, so each test budgets a random month of its own, far in the future.
+ * Only odd months are drawn: the month after each one stays free for the test
+ * that needs a second version of a budget.
+ */
+function uniqueMonth(): string {
+  const year = 2100 + randomInt(7800);
+  const month = 1 + 2 * randomInt(6);
+  return `${year}-${String(month).padStart(2, "0")}-01`;
 }
 
 /** Inserts a row a fixture needs, and fails the test with Supabase's answer if it is rejected. */
@@ -194,5 +279,80 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await use(workout);
 
     await deleteRows(userA, "workouts", { id: `eq.${workout.id}` });
+  },
+
+  transactionNote: async ({ userA, userB }, use) => {
+    const note = uniqueName("transaction");
+    await use(note);
+
+    for (const user of [userA, userB]) {
+      await deleteRows(user, "transactions", { note: `like.${note}*` });
+    }
+  },
+
+  transaction: async ({ userA, userB }, use) => {
+    const transaction = await insertRow<TransactionRow>(userA, "transactions", {
+      type: "expense",
+      category: "food",
+      amount: 25.5,
+      occurred_on: "2026-01-15",
+    });
+    await use(transaction);
+
+    // Both users: with no note to find it by, the id is all that reaches a row a test handed over
+    for (const user of [userA, userB]) {
+      await deleteRows(user, "transactions", { id: `eq.${transaction.id}` });
+    }
+  },
+
+  budgetMonth: async ({ userA, userB }, use) => {
+    const month = uniqueMonth();
+    await use(month);
+
+    const end = monthAfter(monthAfter(month));
+    for (const user of [userA, userB]) {
+      await deleteRows(user, "budgets", {
+        and: `(effective_from.gte.${month},effective_from.lt.${end})`,
+      });
+    }
+  },
+
+  budget: async ({ userA, budgetMonth }, use) => {
+    await use(
+      await insertRow<BudgetRow>(userA, "budgets", {
+        category: "food",
+        effective_from: budgetMonth,
+        monthly_limit: 300,
+      }),
+    );
+  },
+
+  goalName: async ({ userA, userB }, use) => {
+    const name = uniqueName("goal");
+    await use(name);
+
+    for (const user of [userA, userB]) {
+      await deleteRows(user, "savings_goals", { name: `like.${name}*` });
+    }
+  },
+
+  savingsGoal: async ({ userA, goalName }, use) => {
+    await use(
+      await insertRow<SavingsGoalRow>(userA, "savings_goals", {
+        name: goalName,
+        target_amount: 1000,
+      }),
+    );
+  },
+
+  savingsContribution: async ({ userA, savingsGoal }, use) => {
+    const contribution = await insertRow<SavingsContributionRow>(userA, "savings_contributions", {
+      goal_id: savingsGoal.id,
+      amount: 50,
+      contributed_on: "2026-01-15",
+    });
+    await use(contribution);
+
+    await deleteRows(userA, "savings_contributions", { id: `eq.${contribution.id}` });
   },
 });

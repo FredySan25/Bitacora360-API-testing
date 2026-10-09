@@ -42,6 +42,7 @@ No hace falta levantar la app: las pruebas van directo a Supabase.
 | `npm test`              | Corre toda la suite                                       |
 | `npm run test:auth`     | Auth y acceso sin sesión (no requiere los dos usuarios)   |
 | `npm run test:habits`   | Tablas del módulo de hábitos (inicia sesión antes)        |
+| `npm run test:finance`  | Tablas del módulo de finanzas (inicia sesión antes)       |
 | `npm run test:ui`       | Modo UI: correr, depurar y ver cada petición              |
 | `npm run report`        | Abre el reporte HTML de la última corrida                 |
 | `npm run report:allure` | Genera y abre el reporte de Allure de la última corrida   |
@@ -62,7 +63,8 @@ npx playwright test -g "row level security"
 support/
   env.ts          Variables de .env (proyecto de Supabase y usuarios de prueba)
   supabase.ts     Peticiones a Supabase: inicio de sesión, contexto de la Data API, expectError
-  fixtures.ts     userA, userB, visitor y los datos de cada prueba (habit, exercise, workout)
+  fixtures.ts     userA, userB, visitor y los datos de cada prueba (habit, exercise, workout,
+                  transaction, budget, savingsGoal, savingsContribution)
   redact-secrets-reporter.ts
                   Quita contraseñas y tokens de los reportes
   clean-allure-results.ts
@@ -72,6 +74,7 @@ tests/
   users.setup.ts  Inicia sesión con los dos usuarios y guarda sus tokens en .auth/
   auth/           Sin sesión guardada: inicio de sesión y acceso sin sesión
   habits/         Con sesión: una spec por tabla del módulo de hábitos
+  finance/        Con sesión: una spec por tabla del módulo de finanzas
 ```
 
 Cada carpeta de `tests/` (salvo `auth`) corresponde a un módulo de `features/`
@@ -84,6 +87,7 @@ en la app, y dentro hay una spec por tabla.
 - **auth** — no depende de `setup`; las pruebas que necesitan credenciales se
   saltan solas si faltan en `.env`.
 - **habits** — depende de `setup` y usa los tokens guardados.
+- **finance** — depende de `setup` y usa los tokens guardados.
 
 ## Convenciones
 
@@ -108,7 +112,12 @@ en la app, y dentro hay una spec por tabla.
   pruebas verifican después, con el dueño, que la fila sigue intacta.
 - Las pruebas no dependen de los datos que ya tengan los usuarios: cada una crea
   lo que necesita con un nombre único (`habitName`, `exerciseName`,
-  `workoutTitle`) y el fixture lo borra al terminar.
+  `workoutTitle`, `goalName`, `transactionNote`) y el fixture lo borra al
+  terminar.
+- `budgets` no tiene nombre y solo admite un presupuesto por usuario, categoría
+  y mes, así que cada prueba usa un mes propio: `budgetMonth` (y el mes
+  siguiente, `monthAfter(budgetMonth)`). El fixture borra al terminar todo
+  presupuesto de esos dos meses.
 
 ## Integración continua
 
@@ -168,7 +177,7 @@ de una petición (con el token del usuario).
 
 ## Agregar un módulo nuevo
 
-Cuando la app agregue una migración (finanzas, watchlist):
+Cuando la app agregue una migración (watchlist):
 
 1. Crea `tests/<módulo>/` con una spec por tabla.
 2. Agrega el proyecto en `playwright.config.ts`, con `dependencies: ["setup"]`,
