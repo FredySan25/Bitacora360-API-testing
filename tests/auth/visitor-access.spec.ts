@@ -12,6 +12,7 @@ const TABLES = [
   "budgets",
   "savings_goals",
   "savings_contributions",
+  "watchlist_items",
 ];
 
 // The tables are granted to signed-in users only, so the anon key alone opens nothing

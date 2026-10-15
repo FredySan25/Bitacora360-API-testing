@@ -23,6 +23,7 @@ npm test                  # toda la suite
 npm run test:auth         # auth y acceso sin sesión
 npm run test:habits       # tablas del módulo de hábitos (corre setup antes)
 npm run test:finance      # tablas del módulo de finanzas (corre setup antes)
+npm run test:watchlist    # tabla del módulo de watchlist (corre setup antes)
 npm run test:ui           # modo UI de Playwright
 npm run report            # abre el reporte HTML de la última corrida
 npm run report:allure     # genera y abre el reporte de Allure de la última corrida
@@ -41,16 +42,17 @@ npx playwright test -g "row level security"         # pruebas por título
 - `SUPABASE_URL` y `SUPABASE_ANON_KEY`: el proyecto de Supabase bajo prueba, los mismos valores que usa la app en su `.env.local`. Sin ellas no corre nada.
 - `API_USER_A_*` y `API_USER_B_*`: dos usuarios dedicados a esta suite y ya confirmados. Son dos porque las pruebas de RLS necesitan un dueño y un ajeno. No son el usuario de la suite E2E, para que ambas suites corran a la vez sin tocar los mismos datos.
 
-Sin los usuarios, `setup` lanza un error (y `habits` y `finance` no corren), mientras que `auth` pasa igual: sus pruebas con credenciales se saltan solas.
+Sin los usuarios, `setup` lanza un error (y `habits`, `finance` y `watchlist` no corren), mientras que `auth` pasa igual: sus pruebas con credenciales se saltan solas.
 
 ## Arquitectura
 
-Cuatro proyectos de Playwright en `playwright.config.ts`:
+Cinco proyectos de Playwright en `playwright.config.ts`:
 
 - `setup` (`tests/users.setup.ts`) inicia sesión una vez con cada usuario y guarda id y access token en `.auth/users.json` (`SESSION_FILE` en `support/env.ts`). Así una corrida hace dos inicios de sesión en total, sin importar cuántos workers haya.
 - `auth` (`tests/auth/`) no depende de `setup`: prueba el endpoint de inicio de sesión y que la Data API no abre nada sin sesión.
 - `habits` (`tests/habits/`) depende de `setup`. Una spec por tabla.
 - `finance` (`tests/finance/`) depende de `setup`. Una spec por tabla: `transactions`, `budgets`, `savings_goals` y `savings_contributions`.
+- `watchlist` (`tests/watchlist/`) depende de `setup`. Una sola tabla, `watchlist_items`, para películas, series y libros.
 
 Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `features/` de la app y tiene su propio proyecto. Un módulo nuevo es una carpeta, un proyecto con `dependencies: ["setup"]`, un script `test:<módulo>` y sus tablas agregadas a la lista de `tests/auth/visitor-access.spec.ts`.
 
@@ -71,6 +73,8 @@ Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `feature
 - `budget`: un presupuesto de `userA` para `food` que empieza en `budgetMonth`.
 - `goalName` y `savingsGoal`: lo mismo que `habitName` y `habit` para `savings_goals`.
 - `savingsContribution`: un aporte de `userA` a `savingsGoal`. Se borra por id.
+- `watchlistTitle`: título único por prueba. Al terminar, borra de ambos usuarios todo item de la watchlist cuyo título empiece con él.
+- `watchlistItem`: una película pendiente de `userA` titulada `watchlistTitle`, creada solo con las columnas obligatorias.
 
 Los fixtures crean y limpian con `insertRow` y `deleteRows`, que hacen fallar la prueba con la respuesta de Supabase si la petición es rechazada.
 
@@ -103,7 +107,8 @@ A diferencia de la suite E2E, el job `api` no necesita `concurrency`: cada prueb
 - `42501` responde 403 con sesión y 401 sin ella.
 - RLS oculta las filas ajenas en lugar de responder con error: un `GET` llega vacío, y un `PATCH` o `DELETE` responde bien sin tocar nada. Esas pruebas verifican después, con el dueño, que la fila sigue igual. Solo el `with check` (insertar o reasignar una fila a otro usuario) responde 403.
 - Para leer la fila que devuelve una escritura se manda `RETURN_ROWS`; sin ese header la respuesta llega vacía.
-- Las pruebas corren en paralelo con los mismos dos usuarios y no dependen de los datos que ya existan. Todo hábito que crea una prueba se llama `habitName` o empieza con él (`${habitName} renamed`), que es lo que permite la limpieza; lo mismo con `exerciseName` para los ejercicios y `workoutTitle` para los entrenamientos. Las filas hijas (`habit_completions`, `workout_sets`) se van solas por el `on delete cascade` de su padre. En finanzas: toda meta de ahorro se llama `goalName` o empieza con él (sus aportes se van por `cascade`), y todo movimiento que una prueba crea sin el fixture `transaction` lleva una nota que empieza con `transactionNote`.
+- Las pruebas corren en paralelo con los mismos dos usuarios y no dependen de los datos que ya existan. Todo hábito que crea una prueba se llama `habitName` o empieza con él (`${habitName} renamed`), que es lo que permite la limpieza; lo mismo con `exerciseName` para los ejercicios y `workoutTitle` para los entrenamientos. Las filas hijas (`habit_completions`, `workout_sets`) se van solas por el `on delete cascade` de su padre. En finanzas: toda meta de ahorro se llama `goalName` o empieza con él (sus aportes se van por `cascade`), y todo movimiento que una prueba crea sin el fixture `transaction` lleva una nota que empieza con `transactionNote`. En watchlist, todo item se titula `watchlistTitle` o empieza con él; la tabla no tiene índice único (los títulos repetidos se permiten a propósito), así que dos items de una prueba pueden compartir el título.
+- `watchlist_items` amarra el estado con dos `check` de varias columnas: solo un item `done` tiene `finished_on` (y todo `done` lo tiene), y solo él tiene `rating`. La app cambia de estado mandando `status`, `finished_on` y `rating` juntos en un solo `PATCH` (`statusChange` en `features/watchlist/items.ts`), y califica mandando solo `rating`; las pruebas reproducen esas peticiones tal cual.
 - Una fila que la limpieza por prefijo no alcanza (un entrenamiento sin título) se crea con un fixture que la borra por id, como `workout`. Una tabla nueva sin columna de nombre sigue ese mismo patrón.
 - `budgets` tiene un índice único por `(user_id, category, effective_from)` y ninguna columna de texto libre, así que lo que aísla a cada prueba es el mes: todo presupuesto que crea una prueba empieza en `budgetMonth` o en `monthAfter(budgetMonth)`, nunca en una fecha fija. El mes sale al azar de unos 46 800 pares de meses; dos pruebas simultáneas con el mismo par son muy improbables, pero no imposibles.
 - La app borra un presupuesto filtrando solo por categoría (`deleteBudgets`), y esa petición se lleva los presupuestos de esa categoría de todos los meses, también los de otra prueba que corra a la vez. La prueba que la reproduce usa `subscriptions`; ninguna otra prueba vuelve a leer un presupuesto de esa categoría.

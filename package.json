@@ -11,6 +11,7 @@
     "test:auth": "playwright test --project=auth",
     "test:habits": "playwright test --project=habits",
     "test:finance": "playwright test --project=finance",
+    "test:watchlist": "playwright test --project=watchlist",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
     "report:allure": "allure open allure-results",

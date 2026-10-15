@@ -36,5 +36,6 @@ export default defineConfig({
     { name: "auth", testDir: "./tests/auth" },
     { name: "habits", testDir: "./tests/habits", dependencies: ["setup"] },
     { name: "finance", testDir: "./tests/finance", dependencies: ["setup"] },
+    { name: "watchlist", testDir: "./tests/watchlist", dependencies: ["setup"] },
   ],
 });

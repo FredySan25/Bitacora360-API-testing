@@ -85,6 +85,18 @@ export type SavingsContributionRow = {
   created_at: string;
 };
 
+export type WatchlistItemRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  media_type: "movie" | "series" | "book";
+  status: "pending" | "in_progress" | "done";
+  rating: number | null;
+  finished_on: string | null;
+  note: string | null;
+  created_at: string;
+};
+
 type TestFixtures = {
   /**
    * Unique name for the habits of one test. When the test ends, every habit of
@@ -140,6 +152,16 @@ type TestFixtures = {
   savingsGoal: SavingsGoalRow;
   /** A contribution of user A to `savingsGoal`, created before the test. It is deleted by id. */
   savingsContribution: SavingsContributionRow;
+  /**
+   * Unique title for the watchlist items of one test. When the test ends, every
+   * item of either user whose title starts with it is deleted.
+   */
+  watchlistTitle: string;
+  /**
+   * A pending movie of user A titled `watchlistTitle`, created with the required
+   * columns alone before the test.
+   */
+  watchlistItem: WatchlistItemRow;
 };
 
 type WorkerFixtures = {
@@ -354,5 +376,23 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await use(contribution);
 
     await deleteRows(userA, "savings_contributions", { id: `eq.${contribution.id}` });
+  },
+
+  watchlistTitle: async ({ userA, userB }, use) => {
+    const title = uniqueName("watchlist");
+    await use(title);
+
+    for (const user of [userA, userB]) {
+      await deleteRows(user, "watchlist_items", { title: `like.${title}*` });
+    }
+  },
+
+  watchlistItem: async ({ userA, watchlistTitle }, use) => {
+    await use(
+      await insertRow<WatchlistItemRow>(userA, "watchlist_items", {
+        title: watchlistTitle,
+        media_type: "movie",
+      }),
+    );
   },
 });
