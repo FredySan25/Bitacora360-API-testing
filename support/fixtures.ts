@@ -95,6 +95,10 @@ export type WatchlistItemRow = {
   finished_on: string | null;
   note: string | null;
   created_at: string;
+  poster_url: string | null;
+  release_year: number | null;
+  catalog_source: "tmdb" | "google_books" | "open_library" | null;
+  catalog_id: string | null;
 };
 
 type TestFixtures = {

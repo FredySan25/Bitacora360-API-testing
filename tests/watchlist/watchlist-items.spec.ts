@@ -7,7 +7,44 @@ const DAY = "2026-01-15";
 const MEDIA_TYPES = ["movie", "series", "book"] as const;
 
 // Same columns as ITEM_COLUMNS in features/watchlist/api.ts
-const ITEM_COLUMNS = "id, title, media_type, status, rating, finished_on, note, created_at";
+const ITEM_COLUMNS =
+  "id, title, media_type, status, rating, finished_on, note, created_at, poster_url, release_year, catalog_source, catalog_id";
+
+const TMDB_POSTER = "https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg";
+
+/** A movie linked to TMDB, with every catalog column. */
+const TMDB_MOVIE = {
+  media_type: "movie",
+  poster_url: TMDB_POSTER,
+  release_year: 1999,
+  catalog_source: "tmdb",
+  catalog_id: "603",
+};
+
+const CATALOG_ITEMS = [
+  TMDB_MOVIE,
+  {
+    media_type: "series",
+    poster_url: "https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg",
+    release_year: 2008,
+    catalog_source: "tmdb",
+    catalog_id: "1396",
+  },
+  {
+    media_type: "book",
+    poster_url: "https://books.google.com/books/content?id=zyTCAlFPjgYC&printsec=frontcover&img=1",
+    release_year: 1965,
+    catalog_source: "google_books",
+    catalog_id: "zyTCAlFPjgYC",
+  },
+  {
+    media_type: "book",
+    poster_url: "https://covers.openlibrary.org/b/id/8231856-L.jpg",
+    release_year: 1937,
+    catalog_source: "open_library",
+    catalog_id: "OL27482W",
+  },
+] as const;
 
 test.describe("watchlist_items", () => {
   for (const media_type of MEDIA_TYPES) {
@@ -29,7 +66,42 @@ test.describe("watchlist_items", () => {
           rating: null,
           finished_on: null,
           note: null,
+          poster_url: null,
+          release_year: null,
+          catalog_source: null,
+          catalog_id: null,
           user_id: userA.id,
+        },
+      ]);
+    });
+  }
+
+  for (const item of CATALOG_ITEMS) {
+    test(`creates a ${item.media_type} linked to ${item.catalog_source} with every catalog column, and reads it`, async ({
+      userA,
+      watchlistTitle,
+    }) => {
+      const response = await userA.request.post("watchlist_items", {
+        headers: RETURN_ROWS,
+        data: { title: watchlistTitle, ...item },
+      });
+      expect(response.status()).toBe(201);
+      const [created]: WatchlistItemRow[] = await response.json();
+
+      const read = await userA.request.get("watchlist_items", {
+        params: { id: `eq.${created.id}`, select: ITEM_COLUMNS },
+      });
+      expect(read.status()).toBe(200);
+      expect(await read.json()).toEqual([
+        {
+          id: created.id,
+          title: watchlistTitle,
+          status: "pending",
+          rating: null,
+          finished_on: null,
+          note: null,
+          created_at: created.created_at,
+          ...item,
         },
       ]);
     });
@@ -410,7 +482,213 @@ test.describe("watchlist_items", () => {
     });
   }
 
-  // The edit form sends the six columns on every save
+  test("accepts a poster url of 500 characters", async ({ userA, watchlistTitle }) => {
+    const poster_url = TMDB_POSTER.padEnd(500, "x");
+
+    const response = await userA.request.post("watchlist_items", {
+      headers: RETURN_ROWS,
+      data: { title: watchlistTitle, ...TMDB_MOVIE, poster_url },
+    });
+
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toMatchObject([{ poster_url }]);
+  });
+
+  for (const [label, poster_url] of [
+    ["a poster url of 501 characters", TMDB_POSTER.padEnd(501, "x")],
+    ["a poster url over http", "http://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg"],
+    ["a poster url from another host", "https://example.com/a.jpg"],
+    [
+      "a poster url from a host that only starts like a catalog one",
+      "https://image.tmdb.org.example.com/a.jpg",
+    ],
+  ]) {
+    test(`rejects ${label}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, ...TMDB_MOVIE, poster_url },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  for (const release_year of [1, 2100]) {
+    test(`accepts a release year of ${release_year}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        headers: RETURN_ROWS,
+        data: { title: watchlistTitle, media_type: "movie", release_year },
+      });
+
+      expect(response.status()).toBe(201);
+      expect(await response.json()).toMatchObject([{ release_year }]);
+    });
+  }
+
+  for (const release_year of [0, 2101]) {
+    test(`rejects a release year of ${release_year}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, media_type: "movie", release_year },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  // On a book, a source other than tmdb passes the type check, so only the list of sources rejects it
+  for (const [label, catalog_source] of [
+    ["a catalog source that does not exist", "imdb"],
+    ["a catalog source in another case", "Google_Books"],
+  ]) {
+    test(`rejects ${label}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, media_type: "book", catalog_source, catalog_id: "OL27482W" },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  test("accepts a catalog id of 64 characters", async ({ userA, watchlistTitle }) => {
+    const catalog_id = "x".repeat(64);
+
+    const response = await userA.request.post("watchlist_items", {
+      headers: RETURN_ROWS,
+      data: { title: watchlistTitle, media_type: "movie", catalog_source: "tmdb", catalog_id },
+    });
+
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toMatchObject([{ catalog_id }]);
+  });
+
+  for (const [label, catalog_id] of [
+    ["an empty catalog id", ""],
+    ["a catalog id of 65 characters", "x".repeat(65)],
+  ]) {
+    test(`rejects ${label}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, media_type: "movie", catalog_source: "tmdb", catalog_id },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  for (const [label, link] of [
+    ["a catalog source without a catalog id", { catalog_source: "tmdb" }],
+    ["a catalog id without a catalog source", { catalog_id: "603" }],
+  ] as const) {
+    test(`rejects ${label}`, async ({ userA, watchlistTitle }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, media_type: "movie", ...link },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  for (const [media_type, catalog_source, catalog_id] of [
+    ["book", "tmdb", "603"],
+    ["movie", "google_books", "zyTCAlFPjgYC"],
+    ["movie", "open_library", "OL27482W"],
+    ["series", "google_books", "zyTCAlFPjgYC"],
+    ["series", "open_library", "OL27482W"],
+  ]) {
+    test(`rejects a ${media_type} linked to ${catalog_source}`, async ({
+      userA,
+      watchlistTitle,
+    }) => {
+      const response = await userA.request.post("watchlist_items", {
+        data: { title: watchlistTitle, media_type, catalog_source, catalog_id },
+      });
+
+      await expectError(response, 400, "23514");
+    });
+  }
+
+  test("does not turn a movie linked to tmdb into a book while it keeps its link", async ({
+    userA,
+    watchlistTitle,
+  }) => {
+    const created = await userA.request.post("watchlist_items", {
+      headers: RETURN_ROWS,
+      data: { title: watchlistTitle, ...TMDB_MOVIE },
+    });
+    expect(created.status()).toBe(201);
+    const [item]: WatchlistItemRow[] = await created.json();
+
+    const response = await userA.request.patch("watchlist_items", {
+      params: { id: `eq.${item.id}` },
+      data: { media_type: "book" },
+    });
+    await expectError(response, 400, "23514");
+
+    const read = await userA.request.get("watchlist_items", {
+      params: { id: `eq.${item.id}`, select: ITEM_COLUMNS },
+    });
+    expect(await read.json()).toMatchObject([TMDB_MOVIE]);
+  });
+
+  test("turns a movie linked to tmdb into a book when the link and poster are cleared", async ({
+    userA,
+    watchlistTitle,
+  }) => {
+    const created = await userA.request.post("watchlist_items", {
+      headers: RETURN_ROWS,
+      data: { title: watchlistTitle, ...TMDB_MOVIE },
+    });
+    expect(created.status()).toBe(201);
+    const [item]: WatchlistItemRow[] = await created.json();
+
+    const response = await userA.request.patch("watchlist_items", {
+      params: { id: `eq.${item.id}` },
+      headers: RETURN_ROWS,
+      data: { media_type: "book", poster_url: null, catalog_source: null, catalog_id: null },
+    });
+
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toMatchObject([
+      {
+        media_type: "book",
+        poster_url: null,
+        release_year: TMDB_MOVIE.release_year,
+        catalog_source: null,
+        catalog_id: null,
+      },
+    ]);
+  });
+
+  test("rejects a poster url without a catalog link", async ({ userA, watchlistTitle }) => {
+    const response = await userA.request.post("watchlist_items", {
+      data: { title: watchlistTitle, media_type: "movie", poster_url: TMDB_POSTER },
+    });
+
+    await expectError(response, 400, "23514");
+  });
+
+  test("does not clear the catalog link of an item that keeps its poster", async ({
+    userA,
+    watchlistTitle,
+  }) => {
+    const created = await userA.request.post("watchlist_items", {
+      headers: RETURN_ROWS,
+      data: { title: watchlistTitle, ...TMDB_MOVIE },
+    });
+    expect(created.status()).toBe(201);
+    const [item]: WatchlistItemRow[] = await created.json();
+
+    const response = await userA.request.patch("watchlist_items", {
+      params: { id: `eq.${item.id}` },
+      data: { catalog_source: null, catalog_id: null },
+    });
+    await expectError(response, 400, "23514");
+
+    const read = await userA.request.get("watchlist_items", {
+      params: { id: `eq.${item.id}`, select: ITEM_COLUMNS },
+    });
+    expect(await read.json()).toMatchObject([TMDB_MOVIE]);
+  });
+
+  // The edit form sends every column on every save
   test("updates every column, as the app does", async ({ userA, watchlistItem }) => {
     const edited = {
       title: `${watchlistItem.title} renamed`,
@@ -419,6 +697,10 @@ test.describe("watchlist_items", () => {
       finished_on: "2026-01-16",
       rating: 3,
       note: "Better than the first one.",
+      poster_url: "https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg",
+      release_year: 2008,
+      catalog_source: "tmdb",
+      catalog_id: "1396",
     };
 
     const response = await userA.request.patch("watchlist_items", {
