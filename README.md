@@ -68,6 +68,10 @@ support/
                   transaction, budget, savingsGoal, savingsContribution, watchlistItem)
   redact-secrets-reporter.ts
                   Quita contraseñas y tokens de los reportes
+  allure-reporter.ts
+                  Reporter de Allure con los nombres de report-suites.ts
+  report-suites.ts
+                  Nombre de cada spec en el reporte de Allure; una spec nueva va aquí
   clean-allure-results.ts
                   Vacía allure-results/ antes de cada corrida
 allurerc.ts       Configuración del reporte de Allure
@@ -137,8 +141,8 @@ web y por eso no dispara este workflow. Son tres jobs encadenados:
 Los reportes de la última corrida de `main` quedan en:
 
 - <https://fredysan25.github.io/Bitacora360-API-testing/> — reporte de Allure:
-  resumen, pruebas agrupadas por proyecto y spec, gráficas y tendencia entre
-  corridas.
+  resumen, pruebas agrupadas por área de la app y funcionalidad
+  (`support/report-suites.ts`), gráficas y tendencia entre corridas.
 - <https://fredysan25.github.io/Bitacora360-API-testing/playwright/> — reporte
   HTML de Playwright, con más detalle para depurar un fallo.
 
@@ -186,3 +190,5 @@ Cuando la app agregue un módulo con tablas nuevas:
 2. Agrega el proyecto en `playwright.config.ts`, con `dependencies: ["setup"]`,
    y su script `test:<módulo>` en `package.json`.
 3. Agrega las tablas nuevas a la lista de `tests/auth/visitor-access.spec.ts`.
+4. Agrega cada spec nueva a `support/report-suites.ts`, con el área del módulo
+   y el nombre de la tabla en palabras.

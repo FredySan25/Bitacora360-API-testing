@@ -19,7 +19,7 @@ export default defineConfig({
     ["./support/redact-secrets-reporter.ts"],
     ["list"],
     ["html", { open: "never" }],
-    ["allure-playwright"],
+    ["./support/allure-reporter.ts"],
   ],
   expect: { timeout: 10_000 },
 

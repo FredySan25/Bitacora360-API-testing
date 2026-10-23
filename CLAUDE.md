@@ -54,7 +54,7 @@ Cinco proyectos de Playwright en `playwright.config.ts`:
 - `finance` (`tests/finance/`) depende de `setup`. Una spec por tabla: `transactions`, `budgets`, `savings_goals` y `savings_contributions`.
 - `watchlist` (`tests/watchlist/`) depende de `setup`. Una sola tabla, `watchlist_items`, para películas, series y libros.
 
-Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `features/` de la app y tiene su propio proyecto. Un módulo nuevo es una carpeta, un proyecto con `dependencies: ["setup"]`, un script `test:<módulo>` y sus tablas agregadas a la lista de `tests/auth/visitor-access.spec.ts`.
+Cada carpeta de `tests/` distinta de `auth` corresponde a un módulo de `features/` de la app y tiene su propio proyecto. Un módulo nuevo es una carpeta, un proyecto con `dependencies: ["setup"]`, un script `test:<módulo>` y sus tablas agregadas a la lista de `tests/auth/visitor-access.spec.ts`, y cada spec con su nombre en `support/report-suites.ts`.
 
 `support/supabase.ts` concentra el trato con Supabase: `signIn`, `dataApiContext` (contexto de peticiones con `baseURL` en `/rest/v1/`, por eso las specs nombran solo la tabla: `get("habits")`), `RETURN_ROWS` y `expectError`.
 
@@ -88,7 +88,7 @@ El linter es oxlint (`.oxlintrc.json`) y no ESLint, porque `typescript-eslint` t
 
 `.github/workflows/ci.yml` tiene tres jobs encadenados: `static` (tipos, lint, formato), `api` (corre toda la suite contra Supabase y arma el sitio) y `report` (lo publica en GitHub Pages desde `main`, también con pruebas fallidas). Los secretos y la configuración de Pages están en el README.
 
-Cada corrida escribe dos reportes: el HTML de Playwright (`playwright-report/`) y los resultados de Allure (`allure-results/`, que `support/clean-allure-results.ts` vacía al empezar). El sitio publicado lleva el reporte de Allure en la raíz, generado con `allure generate` según `allurerc.ts`, y el de Playwright en `/playwright/`. La tendencia entre corridas sale de `allure-history.jsonl`, que el job descarga del sitio publicado antes de generar y vuelve a subir.
+Cada corrida escribe dos reportes: el HTML de Playwright (`playwright-report/`) y los resultados de Allure (`allure-results/`, que `support/clean-allure-results.ts` vacía al empezar). El sitio publicado lleva el reporte de Allure en la raíz, generado con `allure generate` según `allurerc.ts`, y el de Playwright en `/playwright/`. La tendencia entre corridas sale de `allure-history.jsonl`, que el job descarga del sitio publicado antes de generar y vuelve a subir. El reporte de Allure agrupa por área de la app y funcionalidad, con los nombres de `support/report-suites.ts` (uno por archivo de `tests/`), y después por `describe`. `support/allure-reporter.ts` es el reporter de Allure con esos nombres: un archivo que no está en el mapa hace fallar la corrida, así que una spec nueva se agrega ahí con su nombre en inglés.
 
 El sitio es público, y eso condiciona la configuración:
 

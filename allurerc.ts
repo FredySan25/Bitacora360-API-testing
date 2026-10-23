@@ -13,7 +13,7 @@ export default {
     awesome: {
       options: {
         reportLanguage: "es",
-        // Playwright project, spec file and describe block
+        // Area of the app and feature (support/report-suites.ts), then the describe block
         groupBy: ["parentSuite", "suite", "subSuite"],
       },
     },
